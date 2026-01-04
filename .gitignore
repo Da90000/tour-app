@@ -6,3 +6,4 @@ dist/
 .env
 backend/firebase-service-account.json
 *.db
+package-lock.json
