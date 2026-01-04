@@ -1,0 +1,9 @@
+[{"user_id":1,"group_id":2,"role":"admin"},
+{"user_id":3,"group_id":2,"role":"member"},
+{"user_id":8,"group_id":2,"role":"member"},
+{"user_id":5,"group_id":2,"role":"member"},
+{"user_id":7,"group_id":2,"role":"member"},
+{"user_id":4,"group_id":2,"role":"member"},
+{"user_id":9,"group_id":2,"role":"member"},
+{"user_id":2,"group_id":2,"role":"member"},
+{"user_id":10,"group_id":2,"role":"member"}]
