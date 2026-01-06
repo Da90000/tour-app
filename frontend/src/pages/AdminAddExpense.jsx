@@ -1,18 +1,36 @@
-// src/pages/AdminAddExpense.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Box, Heading, VStack, FormControl, FormLabel, Button, useToast, Select, Container,
-  NumberInput, NumberInputField, Text, Spinner, Checkbox, CheckboxGroup, Stack,
-  HStack, SimpleGrid
-} from '@chakra-ui/react';
+  Receipt,
+  Users as UsersIcon,
+  Calendar,
+  MapPin,
+  Target,
+  CheckCircle2,
+  Loader2,
+  ArrowRight,
+  Search,
+  UserCheck,
+  Banknote,
+  Hash
+} from 'lucide-react';
+import { toast } from 'sonner';
 import api from '../api/api';
 import eventBus from '../services/eventBus';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
+import { Label } from '../components/ui/label';
+import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
+import { Skeleton } from '../components/ui/skeleton';
+import { Checkbox } from '../components/ui/checkbox';
+import { Badge } from '../components/ui/badge';
+import { cn } from '../lib/utils';
 
 const AdminAddExpense = () => {
   const [groups, setGroups] = useState([]);
   const [itineraries, setItineraries] = useState({});
   const [users, setUsers] = useState({});
-  
+
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [selectedDayId, setSelectedDayId] = useState('');
   const [selectedLocationId, setSelectedLocationId] = useState('');
@@ -23,7 +41,6 @@ const AdminAddExpense = () => {
 
   const [loading, setLoading] = useState({ groups: true, itinerary: false, users: false });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const toast = useToast();
 
   useEffect(() => {
     const fetchAdminGroups = async () => {
@@ -31,11 +48,14 @@ const AdminAddExpense = () => {
         const response = await api.get('/groups');
         const adminGroups = response.data.filter(g => g.role === 'admin');
         setGroups(adminGroups);
-      } catch (error) { toast({ title: 'Could not load groups.', status: 'error' }); }
-      finally { setLoading(prev => ({ ...prev, groups: false })); }
+      } catch (error) {
+        toast.error('Failed to load tour groups.');
+      } finally {
+        setLoading(prev => ({ ...prev, groups: false }));
+      }
     };
     fetchAdminGroups();
-  }, [toast]);
+  }, []);
 
   const handleGroupChange = useCallback(async (groupId) => {
     setSelectedGroupId(groupId);
@@ -52,17 +72,26 @@ const AdminAddExpense = () => {
         const usersRes = await api.get(`/groups/${groupId}/users`);
         setUsers(prev => ({ ...prev, [groupId]: usersRes.data.filter(u => u.role !== 'admin') }));
       }
-    } catch (error) { toast({ title: 'Could not load group data.', status: 'error' }); }
-    finally { setLoading(prev => ({ ...prev, itinerary: false, users: false })); }
-  }, [itineraries, users, toast]);
+    } catch (error) {
+      toast.error('Failed to load tour details.');
+    } finally {
+      setLoading(prev => ({ ...prev, itinerary: false, users: false }));
+    }
+  }, [itineraries, users]);
 
   const availableDays = itineraries[selectedGroupId]?.days || [];
   const availableLocations = availableDays.find(d => d.day_id.toString() === selectedDayId)?.locations || [];
   const availableEvents = availableLocations.find(l => l.location_id.toString() === selectedLocationId)?.events || [];
   const availableUsers = users[selectedGroupId] || [];
 
-  const handleSelectAllUsers = (e) => {
-    if (e.target.checked) {
+  const toggleUser = (userId) => {
+    setSelectedUserIds(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const handleSelectAllUsers = (checked) => {
+    if (checked) {
       setSelectedUserIds(availableUsers.map(u => u.user_id.toString()));
     } else {
       setSelectedUserIds([]);
@@ -72,7 +101,7 @@ const AdminAddExpense = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedEventId || selectedUserIds.length === 0 || !quantity || !actualCost) {
-      toast({ title: "Please complete all fields.", status: "warning" });
+      toast.warning("Please complete all expense details.");
       return;
     }
     setIsSubmitting(true);
@@ -83,56 +112,228 @@ const AdminAddExpense = () => {
         quantity: parseInt(quantity),
         actual_cost_per_unit: parseFloat(actualCost),
       });
-      toast({ title: "Expense(s) added successfully!", status: 'success' });
+      toast.success("Expenses logged successfully for all selected members.");
       eventBus.emit('financeDataChanged');
-      // Reset form partially for convenience
       setSelectedEventId('');
       setSelectedUserIds([]);
       setQuantity(1);
       setActualCost('');
-    } catch (error) { toast({ title: 'Submission failed.', description: error.response?.data?.message, status: 'error' }); }
-    finally { setIsSubmitting(false); }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save expense records.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <Container maxW="container.lg">
-      <Box p={8} borderWidth="1px" borderRadius="lg" shadow="md">
-        <Heading mb={6}>Add Expense for Users</Heading>
-        <VStack as="form" spacing={6} align="stretch" onSubmit={handleSubmit}>
-          {loading.groups ? <Spinner /> : (
-            <SimpleGrid columns={{ base: 1, md: 4 }} spacing={4}>
-              <FormControl isRequired><FormLabel>1. Group</FormLabel><Select placeholder="Select Group" value={selectedGroupId} onChange={e => handleGroupChange(e.target.value)}>{groups.map(g => <option key={g.group_id} value={g.group_id}>{g.group_name}</option>)}</Select></FormControl>
-              <FormControl isRequired isDisabled={!selectedGroupId || loading.itinerary}><FormLabel>2. Day</FormLabel><Select placeholder="Select Day" value={selectedDayId} onChange={e => setSelectedDayId(e.target.value)}>{availableDays.map(d => <option key={d.day_id} value={d.day_id}>Day {d.day_number}: {d.title}</option>)}</Select></FormControl>
-              <FormControl isRequired isDisabled={!selectedDayId}><FormLabel>3. Location</FormLabel><Select placeholder="Select Location" value={selectedLocationId} onChange={e => setSelectedLocationId(e.target.value)}>{availableLocations.map(l => <option key={l.location_id} value={l.location_id}>{l.location_name}</option>)}</Select></FormControl>
-              <FormControl isRequired isDisabled={!selectedLocationId}><FormLabel>4. Event</FormLabel><Select placeholder="Select Event" value={selectedEventId} onChange={e => setSelectedEventId(e.target.value)}>{availableEvents.map(ev => <option key={ev.event_id} value={ev.event_id}>{ev.event_name}</option>)}</Select></FormControl>
-            </SimpleGrid>
-          )}
+    <div className="max-w-4xl mx-auto space-y-8 fade-in py-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight text-white italic">Add Batch Expenses</h1>
+          <p className="text-slate-400">Add common expenses for multiple members at once.</p>
+        </div>
+        <div className="flex items-center gap-2 bg-primary/10 border border-primary/20 px-4 py-2 rounded-2xl">
+          <UserCheck className="h-4 w-4 text-primary" />
+          <span className="text-sm font-bold text-primary">{selectedUserIds.length} Members Selected</span>
+        </div>
+      </div>
 
-          <FormControl isRequired isDisabled={!selectedGroupId || loading.users}>
-            <FormLabel>5. Select Users</FormLabel>
-            {loading.users ? <Spinner/> : (
-                <Box p={4} borderWidth="1px" borderRadius="md" maxH="200px" overflowY="auto">
-                    <Checkbox isChecked={availableUsers.length > 0 && selectedUserIds.length === availableUsers.length} onChange={handleSelectAllUsers} mb={2}>Select All</Checkbox>
-                    <CheckboxGroup value={selectedUserIds} onChange={setSelectedUserIds}>
-                        <Stack>
-                            {availableUsers.map(u => <Checkbox key={u.user_id} value={u.user_id.toString()}>{u.username}</Checkbox>)}
-                        </Stack>
-                    </CheckboxGroup>
-                </Box>
-            )}
-          </FormControl>
-          
-          <HStack>
-            <FormControl isRequired><FormLabel>Quantity</FormLabel><NumberInput min={1} value={quantity} onChange={(val) => setQuantity(val)}><NumberInputField /></NumberInput></FormControl>
-            <FormControl isRequired><FormLabel>Actual Cost Per Unit</FormLabel><NumberInput min={0} value={actualCost} onChange={(val) => setActualCost(val)}><NumberInputField placeholder="e.g., 550.50" /></NumberInput></FormControl>
-          </HStack>
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Sector Targeting Grid */}
+        <div className="grid md:grid-cols-4 gap-4">
+          <Card className="border-white/5 bg-slate-900/40 backdrop-blur-md">
+            <CardHeader className="p-4 pb-2">
+              <Label className="text-[10px] uppercase font-bold tracking-widest text-slate-500">1. Select Group</Label>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              {loading.groups ? <Skeleton className="h-10 w-full" /> : (
+                <Select
+                  className="bg-transparent border-white/10"
+                  value={selectedGroupId}
+                  onChange={e => handleGroupChange(e.target.value)}
+                >
+                  <option value="" className="bg-slate-900">Select...</option>
+                  {groups.map(g => <option key={g.group_id} value={g.group_id} className="bg-slate-900">{g.group_name}</option>)}
+                </Select>
+              )}
+            </CardContent>
+          </Card>
 
-          <Button type="submit" colorScheme="purple" width="full" isLoading={isSubmitting} isDisabled={selectedUserIds.length === 0 || !selectedEventId}>
-            Add Expense
-          </Button>
-        </VStack>
-      </Box>
-    </Container>
+          <Card className={cn("border-white/5 bg-slate-900/40 backdrop-blur-md transition-opacity", !selectedGroupId && "opacity-30")}>
+            <CardHeader className="p-4 pb-2">
+              <Label className="text-[10px] uppercase font-bold tracking-widest text-slate-500">2. Select Day</Label>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <Select
+                className="bg-transparent border-white/10"
+                value={selectedDayId}
+                onChange={e => setSelectedDayId(e.target.value)}
+                disabled={!selectedGroupId || loading.itinerary}
+              >
+                <option value="" className="bg-slate-900">Select...</option>
+                {availableDays.map(d => <option key={d.day_id} value={d.day_id} className="bg-slate-900">Day {d.day_number}</option>)}
+              </Select>
+            </CardContent>
+          </Card>
+
+          <Card className={cn("border-white/5 bg-slate-900/40 backdrop-blur-md transition-opacity", !selectedDayId && "opacity-30")}>
+            <CardHeader className="p-4 pb-2">
+              <Label className="text-[10px] uppercase font-bold tracking-widest text-slate-500">3. Location</Label>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <Select
+                className="bg-transparent border-white/10"
+                value={selectedLocationId}
+                onChange={e => setSelectedLocationId(e.target.value)}
+                disabled={!selectedDayId}
+              >
+                <option value="" className="bg-slate-900">Select...</option>
+                {availableLocations.map(l => <option key={l.location_id} value={l.location_id} className="bg-slate-900">{l.location_name}</option>)}
+              </Select>
+            </CardContent>
+          </Card>
+
+          <Card className={cn("border-white/5 bg-slate-900/40 backdrop-blur-md transition-opacity", !selectedLocationId && "opacity-30")}>
+            <CardHeader className="p-4 pb-2">
+              <Label className="text-[10px] uppercase font-bold tracking-widest text-slate-500">4. Event/Activity</Label>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <Select
+                className="bg-transparent border-white/10 font-bold"
+                value={selectedEventId}
+                onChange={e => setSelectedEventId(e.target.value)}
+                disabled={!selectedLocationId}
+              >
+                <option value="" className="bg-slate-900">Select...</option>
+                {availableEvents.map(ev => <option key={ev.event_id} value={ev.event_id} className="bg-slate-900">{ev.event_name}</option>)}
+              </Select>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Operative Selection */}
+          <Card className={cn(
+            "border-white/5 bg-slate-900/40 backdrop-blur-md rounded-[2rem] overflow-hidden",
+            (!selectedGroupId || loading.users) && "opacity-30 grayscale"
+          )}>
+            <CardHeader className="border-b border-white/5 pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <UsersIcon className="h-5 w-5 text-primary" /> Select Members
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="select-all"
+                    checked={availableUsers.length > 0 && selectedUserIds.length === availableUsers.length}
+                    onCheckedChange={handleSelectAllUsers}
+                  />
+                  <Label htmlFor="select-all" className="text-xs text-slate-400 cursor-pointer">Select All</Label>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {loading.users ? <Skeleton className="h-40 w-full rounded-xl" /> : (
+                <div className="grid sm:grid-cols-2 gap-3 max-h-[320px] overflow-y-auto pr-2 scrollbar-none">
+                  {availableUsers.map(u => (
+                    <div
+                      key={u.user_id}
+                      className={cn(
+                        "p-3 rounded-xl border border-white/5 flex items-center gap-3 cursor-pointer transition-all",
+                        selectedUserIds.includes(u.user_id.toString())
+                          ? "bg-primary/20 border-primary/40 ring-1 ring-primary/40"
+                          : "bg-white/5 hover:bg-white/10"
+                      )}
+                      onClick={() => toggleUser(u.user_id.toString())}
+                    >
+                      <Checkbox
+                        checked={selectedUserIds.includes(u.user_id.toString())}
+                        onCheckedChange={() => toggleUser(u.user_id.toString())}
+                      />
+                      <span className="text-sm font-medium text-white truncate">{u.username}</span>
+                    </div>
+                  ))}
+                  {availableUsers.length === 0 && (
+                    <div className="col-span-2 py-12 text-center text-slate-600 italic">
+                      No members found in this group.
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Transaction Parameters */}
+          <div className="space-y-6">
+            <Card className="border-white/5 bg-slate-900/40 backdrop-blur-md rounded-[2rem] overflow-hidden">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Banknote className="h-5 w-5 text-primary" /> Expense Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Unit Quantity</Label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-3 h-4 w-4 text-slate-600" />
+                    <Input
+                      type="number"
+                      min="1"
+                      className="pl-10 bg-white/5 border-white/10 text-white font-mono"
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Unit Cost (৳)</Label>
+                  <div className="relative">
+                    <Banknote className="absolute left-3 top-3 h-4 w-4 text-slate-600" />
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      className="pl-10 bg-white/5 border-white/10 text-white font-mono text-xl text-primary"
+                      value={actualCost}
+                      placeholder="0.00"
+                      onChange={(e) => setActualCost(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Total Transaction Amount</p>
+                    <p className="text-2xl font-bold font-mono text-white tracking-tighter italic">
+                      ৳{((parseFloat(actualCost) || 0) * (parseInt(quantity) || 0) * selectedUserIds.length).toLocaleString()}
+                    </p>
+                  </div>
+                  <Target className="h-8 w-8 text-primary opacity-20" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Button
+              type="submit"
+              className="w-full h-16 text-xl font-bold shadow-2xl shadow-primary/20 rounded-[1.5rem] bg-gradient-to-r from-primary to-violet-600 hover:scale-[1.02] active:scale-[0.98] transition-all"
+              disabled={isSubmitting || selectedUserIds.length === 0 || !selectedEventId || !actualCost}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                  Adding Records...
+                </>
+              ) : (
+                <>
+                  Add Batch Expenses
+                  <CheckCircle2 className="ml-2 h-6 w-6" />
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </form>
+    </div>
   );
 };
 

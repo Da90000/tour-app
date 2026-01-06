@@ -1,9 +1,18 @@
-// src/components/admin/EditDayModal.jsx
 import React, { useState, useEffect } from 'react';
 import {
-  Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody,
-  ModalCloseButton, Button, FormControl, FormLabel, Input, useToast, VStack, Textarea
-} from '@chakra-ui/react';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '../ui/dialog';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { toast } from 'sonner';
+import { Edit3, Calendar, Type, AlignLeft, Loader2, Save } from 'lucide-react';
 import api from '../../api/api';
 
 const EditDayModal = ({ isOpen, onClose, day, onUpdate }) => {
@@ -12,7 +21,6 @@ const EditDayModal = ({ isOpen, onClose, day, onUpdate }) => {
   const [dayDate, setDayDate] = useState('');
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const toast = useToast();
 
   useEffect(() => {
     if (day) {
@@ -27,51 +35,113 @@ const EditDayModal = ({ isOpen, onClose, day, onUpdate }) => {
 
   const handleSubmit = async () => {
     if (!dayNumber || !title || !dayDate) {
-      toast({ title: 'All fields are required.', status: 'warning' });
+      toast.warning('Phase parameters incomplete. Identification results are mandatory.');
       return;
     }
     setIsSubmitting(true);
-    const updatedDay = {
-      day_number: parseInt(dayNumber),
-      title,
-      day_date: dayDate,
-      description
-    };
     try {
-      await api.put(`/tours/days/${day.day_id}`, updatedDay);
-      toast({ title: 'Day Updated!', status: 'success', isClosable: true });
-      onUpdate();
+      await api.put(`/tours/days/${day.day_id}`, {
+        day_number: parseInt(dayNumber),
+        title,
+        day_date: dayDate,
+        description
+      });
+      toast.success('Timeline phase recalibrated successfully.');
+      if (onUpdate) onUpdate();
       onClose();
     } catch (error) {
-      toast({ title: 'Update Failed', status: 'error', isClosable: true });
+      toast.error('Sync failed. Recalibration protocols aborted.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose}>
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>Edit Day {day.day_number}</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          <VStack spacing={4}>
-            <FormControl isRequired><FormLabel>Day Number</FormLabel><Input type="number" value={dayNumber} onChange={(e) => setDayNumber(e.target.value)} /></FormControl>
-            <FormControl isRequired><FormLabel>Title</FormLabel><Input value={title} onChange={(e) => setTitle(e.target.value)} /></FormControl>
-            <FormControl isRequired><FormLabel>Date</FormLabel><Input type="date" value={dayDate} onChange={(e) => setDayDate(e.target.value)} /></FormControl>
-            <FormControl>
-              <FormLabel>Description (optional)</FormLabel>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="A brief summary of the day's plan..." />
-            </FormControl>
-          </VStack>
-        </ModalBody>
-        <ModalFooter>
-          <Button onClick={onClose} isDisabled={isSubmitting}>Cancel</Button>
-          <Button colorScheme="purple" ml={3} onClick={handleSubmit} isLoading={isSubmitting}>Save Changes</Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+    <Dialog open={isOpen} onOpenChange={(val) => !val && onClose()}>
+      <DialogContent className="sm:max-w-[450px]">
+        <DialogHeader>
+          <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4 border border-primary/20">
+            <Edit3 className="h-6 w-6" />
+          </div>
+          <DialogTitle className="text-2xl font-bold tracking-tight text-white italic">Recalibrate Phase</DialogTitle>
+          <DialogDescription className="text-slate-400">
+            Adjusting metadata for timeline segment <span className="text-white font-medium italic">Day {day.day_number}</span>.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold flex items-center gap-2">
+                <Calendar className="h-3 w-3" /> Day Index
+              </Label>
+              <Input
+                type="number"
+                className="bg-white/5 border-white/10 text-white font-mono"
+                value={dayNumber}
+                onChange={(e) => setDayNumber(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold flex items-center gap-2">
+                <Calendar className="h-3 w-3" /> Launch Date
+              </Label>
+              <Input
+                type="date"
+                className="bg-white/5 border-white/10 text-white flex-row-reverse"
+                value={dayDate}
+                onChange={(e) => setDayDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold flex items-center gap-2">
+              <Type className="h-3 w-3" /> Phase Codename
+            </Label>
+            <Input
+              className="bg-white/5 border-white/10 text-white"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-[10px] uppercase tracking-widest text-slate-500 font-bold flex items-center gap-2">
+              <AlignLeft className="h-3 w-3" /> Operational Summary
+            </Label>
+            <Textarea
+              className="bg-white/5 border-white/10 text-white min-h-[100px]"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="ghost" onClick={onClose} disabled={isSubmitting} className="text-slate-500">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                Commit Changes
+                <Save className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

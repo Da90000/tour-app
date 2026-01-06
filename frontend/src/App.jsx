@@ -1,7 +1,6 @@
-// src/App.jsx
 import React, { Suspense, lazy } from 'react';
-import { Box, Spinner } from '@chakra-ui/react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 
 // Pages
 const Login = lazy(() => import('./pages/Login'));
@@ -18,9 +17,12 @@ const AdminAddExpense = lazy(() => import('./pages/AdminAddExpense'));
 
 // Loading Fallback
 const Loading = () => (
-  <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
-    <Spinner size="xl" color="brand.500" thickness="4px" emptyColor="gray.200" />
-  </Box>
+  <div className="flex flex-col items-center justify-center h-screen bg-slate-950 gap-4">
+    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+    <p className="text-slate-500 font-mono text-xs uppercase tracking-[0.3em] font-bold animate-pulse">
+      Initializing Neural Link...
+    </p>
+  </div>
 );
 
 // Components
@@ -40,7 +42,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="group/:groupId/itinerary" element={<Itinerary />} />
           <Route path="my-expenses" element={<MyExpenses />} />
-          <Route path="groups/new" element={<AdminRoute> <NewGroup /> </AdminRoute>} />
+          <Route path="groups/new" element={<NewGroup />} />
         </Route>
 
         <Route path="/admin" element={<ProtectedRoute> <AppLayout /> </ProtectedRoute>}>

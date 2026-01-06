@@ -1,14 +1,106 @@
-// src/components/MapView.jsx
 import React, { useState, useCallback, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer } from '@react-google-maps/api';
 import {
-  Box, Text, Spinner, Center, Flex, VStack, Divider, Button, Link,
-  Stat, StatLabel, StatNumber, Heading
-} from '@chakra-ui/react';
-import { ExternalLinkIcon } from '@chakra-ui/icons';
+  MapPin,
+  Navigation,
+  ExternalLink,
+  Clock,
+  Navigation2,
+  Loader2,
+  Info
+} from 'lucide-react';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Badge } from './ui/badge';
+import { cn } from '../lib/utils';
 
 const containerStyle = { width: '100%', height: '100%', borderRadius: 'inherit' };
 const libraries = ['places'];
+
+const mapOptions = {
+  disableDefaultUI: true,
+  zoomControl: false,
+  clickableIcons: false,
+  styles: [
+    {
+      "elementType": "geometry",
+      "stylers": [{ "color": "#242f3e" }]
+    },
+    {
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#746855" }]
+    },
+    {
+      "elementType": "labels.text.stroke",
+      "stylers": [{ "color": "#242f3e" }]
+    },
+    {
+      "featureType": "administrative.locality",
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#d59563" }]
+    },
+    {
+      "featureType": "poi",
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#d59563" }]
+    },
+    {
+      "featureType": "poi.park",
+      "elementType": "geometry",
+      "stylers": [{ "color": "#263c3f" }]
+    },
+    {
+      "featureType": "poi.park",
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#6b9a76" }]
+    },
+    {
+      "featureType": "road",
+      "elementType": "geometry",
+      "stylers": [{ "color": "#38414e" }]
+    },
+    {
+      "featureType": "road",
+      "elementType": "geometry.stroke",
+      "stylers": [{ "color": "#212a37" }]
+    },
+    {
+      "featureType": "road",
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#9ca5b3" }]
+    },
+    {
+      "featureType": "road.highway",
+      "elementType": "geometry",
+      "stylers": [{ "color": "#746855" }]
+    },
+    {
+      "featureType": "road.highway",
+      "elementType": "geometry.stroke",
+      "stylers": [{ "color": "#1f2835" }]
+    },
+    {
+      "featureType": "road.highway",
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#f3d19c" }]
+    },
+    {
+      "featureType": "water",
+      "elementType": "geometry",
+      "stylers": [{ "color": "#17263c" }]
+    },
+    {
+      "featureType": "water",
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#515c6d" }]
+    },
+    {
+      "featureType": "water",
+      "elementType": "labels.text.stroke",
+      "stylers": [{ "color": "#17263c" }]
+    }
+  ]
+};
 
 const MapView = ({ pins }) => {
   const { isLoaded, loadError } = useJsApiLoader({
@@ -27,7 +119,6 @@ const MapView = ({ pins }) => {
     setMapPins(pins || []);
   }, [pins]);
 
-
   useEffect(() => {
     if (!navigator.geolocation) return;
     const watchId = navigator.geolocation.watchPosition(
@@ -38,22 +129,18 @@ const MapView = ({ pins }) => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-
   const onLoad = useCallback(mapInstance => setMap(mapInstance), []);
   const onUnmount = useCallback(() => setMap(null), []);
 
   useEffect(() => {
     if (map && isLoaded && (mapPins.length > 0 || userPosition)) {
       const bounds = new window.google.maps.LatLngBounds();
-
       if (mapPins.length > 0) {
         mapPins.forEach(pin => bounds.extend({ lat: pin.latitude, lng: pin.longitude }));
       }
-
       if (userPosition) {
         bounds.extend(userPosition);
       }
-
       if (!bounds.isEmpty()) {
         if (bounds.getNorthEast().equals(bounds.getSouthWest())) {
           map.setCenter(bounds.getCenter());
@@ -82,15 +169,10 @@ const MapView = ({ pins }) => {
           ...result.routes[0].legs[0]
         });
       } else {
-        console.error(`Error fetching directions: ${status}`);
         setSelectedDestination({ name: 'Route not found' });
       }
-    }
-    );
+    });
   };
-
-  if (loadError) return <Center h="100%" bg="red.100"><Text>Map cannot be loaded.</Text></Center>;
-  if (!isLoaded) return <Center h="100%"><Spinner size="xl" /></Center>;
 
   const generateGoogleMapsUrl = () => {
     if (!userPosition || !selectedDestination?.end_location) return '#';
@@ -99,73 +181,125 @@ const MapView = ({ pins }) => {
     return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
   };
 
+  if (loadError) return (
+    <div className="h-full w-full flex flex-col items-center justify-center bg-slate-900/50 text-red-400">
+      <AlertCircle className="h-8 w-8 mb-2" />
+      <span className="font-bold uppercase tracking-widest text-xs">Navigation System Error</span>
+    </div>
+  );
+
+  if (!isLoaded) return (
+    <div className="h-full w-full flex flex-col items-center justify-center bg-slate-900/50 text-primary">
+      <Loader2 className="h-8 w-8 animate-spin mb-2" />
+      <span className="font-bold uppercase tracking-widest text-[10px]">Loading Satellite Interface...</span>
+    </div>
+  );
+
   return (
-    <Box position="relative" w="100%" h="100%">
+    <div className="relative w-full h-full overflow-hidden">
       <GoogleMap
         mapContainerStyle={containerStyle}
         onLoad={onLoad}
         onUnmount={onUnmount}
-        options={{ disableDefaultUI: true, zoomControl: true, clickableIcons: false }}
+        options={mapOptions}
         onClick={() => { setDirections(null); setSelectedDestination(null); }}
       >
         {userPosition && (
-          <Marker position={userPosition} title="Your Location" icon={{ path: window.google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#4285F4', fillOpacity: 1, strokeColor: 'white', strokeWeight: 2 }} />
+          <Marker
+            position={userPosition}
+            title="User Position"
+            icon={{
+              path: window.google.maps.SymbolPath.CIRCLE,
+              scale: 7,
+              fillColor: '#8b5cf6',
+              fillOpacity: 1,
+              strokeColor: 'white',
+              strokeWeight: 2
+            }}
+          />
         )}
 
         {mapPins.map((pin) => (
           <Marker
             key={`pin-${pin.id}`}
             position={{ lat: pin.latitude, lng: pin.longitude }}
-            label={{ text: `${pin.order_in_day}`, color: "white", fontWeight: "bold" }}
+            label={{ text: `${pin.order_in_day}`, color: "white", fontWeight: "bold", fontSize: "14px" }}
             title={pin.name}
             onClick={() => calculateRoute(pin)}
           />
         ))}
 
-        {directions && <DirectionsRenderer directions={directions} options={{ suppressMarkers: true, polylineOptions: { strokeColor: '#4285F4', strokeWeight: 5, strokeOpacity: 0.8 } }} />}
+        {directions && (
+          <DirectionsRenderer
+            directions={directions}
+            options={{
+              suppressMarkers: true,
+              polylineOptions: {
+                strokeColor: '#8b5cf6',
+                strokeWeight: 6,
+                strokeOpacity: 0.6
+              }
+            }}
+          />
+        )}
       </GoogleMap>
 
+      {/* Floating Header */}
+      <div className="absolute top-4 left-4 z-10">
+        <Badge className="bg-slate-900/80 backdrop-blur-md border-white/10 text-slate-300 px-4 py-2 flex items-center gap-2">
+          <Navigation className="h-3 w-3 text-primary" />
+          <span className="text-[10px] font-bold uppercase tracking-widest">Active Tracking Active</span>
+        </Badge>
+      </div>
+
       {selectedDestination && (
-        <Box
-          position="absolute"
-          bottom="20px"
-          left="50%"
-          transform="translateX(-50%)"
-          bg="white"
-          p={4}
-          borderRadius="lg"
-          shadow="lg"
-          zIndex={1}
-          w="90%"
-          maxW="400px"
-        >
-          <VStack align="stretch" spacing={3}>
-            <Heading size="md">Route to: {selectedDestination.name}</Heading>
-            <Divider />
-            <Flex justify="space-around">
-              <Stat textAlign="center">
-                <StatLabel>Distance</StatLabel>
-                <StatNumber>{selectedDestination.distance?.text || 'N/A'}</StatNumber>
-              </Stat>
-              <Stat textAlign="center">
-                <StatLabel>Est. Time</StatLabel>
-                <StatNumber>{selectedDestination.duration?.text || 'N/A'}</StatNumber>
-              </Stat>
-            </Flex>
-            <Button
-              as={Link}
-              href={generateGoogleMapsUrl()}
-              isExternal
-              colorScheme="blue"
-              rightIcon={<ExternalLinkIcon />}
-              width="full"
-            >
-              Open in Google Maps App
-            </Button>
-          </VStack>
-        </Box>
+        <div className="absolute bottom-6 left-6 right-6 z-10 fade-in">
+          <Card className="bg-slate-900/90 backdrop-blur-2xl border-white/5 shadow-2xl rounded-3xl overflow-hidden max-w-md mx-auto">
+            <CardHeader className="pb-2 border-b border-white/5">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-bold text-white flex items-center gap-2 italic">
+                  <MapPin className="h-4 w-4 text-primary" /> {selectedDestination.name}
+                </CardTitle>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500" onClick={() => setSelectedDestination(null)}>
+                  ×
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest flex items-center gap-1.5">
+                    <Navigation2 className="h-3 w-3" /> Distance
+                  </p>
+                  <p className="text-xl font-bold font-mono text-white italic">
+                    {selectedDestination.distance?.text || 'N/A'}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" /> Duration
+                  </p>
+                  <p className="text-xl font-bold font-mono text-white italic">
+                    {selectedDestination.duration?.text || 'N/A'}
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                as="a"
+                href={generateGoogleMapsUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full h-12 font-bold shadow-lg shadow-primary/20 bg-primary hover:bg-primary/80"
+              >
+                Open in External Navigation
+                <ExternalLink className="ml-2 h-4 w-4" />
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       )}
-    </Box>
+    </div>
   );
 };
 

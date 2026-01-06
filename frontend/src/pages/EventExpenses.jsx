@@ -1,34 +1,69 @@
-// src/pages/EventExpenses.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Box, Heading, Text, Spinner, Alert, AlertIcon, Accordion, AccordionItem,
-  AccordionButton, AccordionPanel, AccordionIcon, Flex, Badge, Table,
-  Thead, Tbody, Tr, Th, Td, TableContainer, useToast, IconButton, HStack, useDisclosure
-} from '@chakra-ui/react';
-import { EditIcon, DeleteIcon } from '@chakra-ui/icons';
+  Receipt,
+  ChevronDown,
+  MoreVertical,
+  Edit3,
+  Trash2,
+  User,
+  Calendar,
+  Banknote,
+  Layers,
+  ArrowRight,
+  Search,
+  Filter,
+  FileText,
+  History,
+  AlertCircle,
+  Loader2
+} from 'lucide-react';
+import { toast } from 'sonner';
 import api from '../api/api';
-import AdminEditExpenseModal from '../components/admin/AdminEditExpenseModal';
-import DeleteConfirmationDialog from '../components/DeleteConfirmationDialog';
 import eventBus from '../services/eventBus';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from '../components/ui/table';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger
+} from '../components/ui/accordion';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '../components/ui/dialog';
+import { Skeleton } from '../components/ui/skeleton';
+import { cn } from '../lib/utils';
 
 const EventExpenses = () => {
   const [summary, setSummary] = useState([]);
   const [details, setDetails] = useState({});
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [loadingDetailsEventId, setLoadingDetailsEventId] = useState(null);
-  const [error, setError] = useState('');
-  const toast = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
-  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
-  
+
   const fetchSummary = useCallback(async () => {
     try {
       const response = await api.get('/finances/admin/event-summary');
       setSummary(response.data);
     } catch (err) {
-      setError('Failed to load event expense summary.');
+      toast.error('Failed to load summary data.');
     } finally {
       setLoadingSummary(false);
     }
@@ -36,7 +71,7 @@ const EventExpenses = () => {
 
   useEffect(() => {
     fetchSummary();
-    eventBus.on('financeDataChanged', fetchSummary); // Listen for global updates
+    eventBus.on('financeDataChanged', fetchSummary);
     return () => eventBus.off('financeDataChanged', fetchSummary);
   }, [fetchSummary]);
 
@@ -46,98 +81,220 @@ const EventExpenses = () => {
     try {
       const response = await api.get(`/finances/event/${eventId}/details`);
       setDetails(prev => ({ ...prev, [eventId]: response.data }));
-    } catch (err) { toast({ title: `Could not load details for event ${eventId}`, status: 'error' }); } 
-    finally { setLoadingDetailsEventId(null); }
-  }, [details, toast]);
-  
+    } catch (err) {
+      toast.error(`Failed to load details for event ${eventId}.`);
+    } finally {
+      setLoadingDetailsEventId(null);
+    }
+  }, [details]);
+
   const refreshDetailsForEvent = useCallback(async (eventId) => {
     setLoadingDetailsEventId(eventId);
     try {
-        const response = await api.get(`/finances/event/${eventId}/details`);
-        setDetails(prev => ({ ...prev, [eventId]: response.data }));
-    } catch(err) { console.error(err); }
-    finally { setLoadingDetailsEventId(null); }
+      const response = await api.get(`/finances/event/${eventId}/details`);
+      setDetails(prev => ({ ...prev, [eventId]: response.data }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingDetailsEventId(null);
+    }
   }, []);
 
-  const handleEditClick = (expense) => { setSelectedExpense(expense); onEditOpen(); };
-  const handleDeleteClick = (expense) => { setSelectedExpense(expense); onDeleteOpen(); };
+  const handleDeleteClick = (expense) => {
+    setSelectedExpense(expense);
+    setIsDeleteDialogOpen(true);
+  };
 
   const confirmDelete = async () => {
     if (!selectedExpense) return;
     try {
       await api.delete(`/expenses/admin/${selectedExpense.expense_id}`);
-      toast({ title: 'Expense Deleted', status: 'success' });
+      toast.success('Expense record deleted successfully.');
       refreshDetailsForEvent(selectedExpense.event_id);
-      fetchSummary(); // Also refetch summary totals
-    } catch (error) { toast({ title: 'Delete Failed', status: 'error' }); } 
-    finally { onClose(); }
+      fetchSummary();
+      eventBus.emit('financeDataChanged');
+    } catch (error) {
+      toast.error('Failed to delete expense.');
+    } finally {
+      setIsDeleteDialogOpen(false);
+    }
   };
 
-  if (loadingSummary) return <Spinner size="xl" display="block" mx="auto" my={8} />;
-  if (error) return <Alert status="error"><AlertIcon />{error}</Alert>;
+  const filteredSummary = summary.filter(s =>
+    s.event_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.group_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.location_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loadingSummary) {
+    return (
+      <div className="space-y-8 animate-pulse">
+        <Skeleton className="h-12 w-64" />
+        <div className="space-y-4">
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <>
-      <Box>
-        <Heading mb={6}>Event Expense Report</Heading>
-        {summary.length === 0 ? (<Text>No expenses have been recorded for any events yet.</Text>) : (
-          <Accordion allowToggle>
-            {summary.map(event => (
-              <AccordionItem key={event.event_id}>
-                <h2>
-                  <AccordionButton onClick={() => handleAccordionChange(event.event_id)} _expanded={{ bg: 'purple.100' }} py={4}>
-                    <Box flex="1" textAlign="left">
-                      <Heading size="sm">{event.event_name}</Heading>
-                      <Text fontSize="xs" color="gray.500">{event.group_name} / {event.location_name}</Text>
-                    </Box>
-                    <Flex gap={4} align="center">
-                      <Badge colorScheme="orange">Qty: {event.total_quantity}</Badge>
-                      <Badge colorScheme="green" fontSize="md" p={2} borderRadius="md">Total: ৳{event.total_expense.toFixed(2)}</Badge>
-                      <AccordionIcon />
-                    </Flex>
-                  </AccordionButton>
-                </h2>
-                <AccordionPanel pb={4}>
-                  {loadingDetailsEventId === event.event_id && <Spinner size="md" />}
-                  {details[event.event_id] && (
-                    details[event.event_id].length > 0 ? (
-                      <TableContainer>
-                        <Table variant="simple" size="sm">
-                          <Thead>
-                            <Tr><Th>User</Th><Th isNumeric>Qty</Th><Th isNumeric>Cost</Th><Th>Date</Th><Th>Actions</Th></Tr>
-                          </Thead>
-                          <Tbody>
-                            {details[event.event_id].map((detail) => (
-                              <Tr key={detail.expense_id}>
-                                <Td>{detail.username}</Td>
-                                <Td isNumeric>{detail.quantity}</Td>
-                                <Td isNumeric>৳{detail.total_cost.toFixed(2)}</Td>
-                                <Td fontSize="xs">{new Date(detail.expense_timestamp).toLocaleDateString()}</Td>
-                                <Td>
-                                  <HStack>
-                                    <IconButton size="sm" icon={<EditIcon/>} onClick={() => handleEditClick({ ...detail, event_id: event.event_id })}/>
-                                    <IconButton size="sm" icon={<DeleteIcon/>} colorScheme="red" onClick={() => handleDeleteClick({ ...detail, event_id: event.event_id })}/>
-                                  </HStack>
-                                </Td>
-                              </Tr>
-                            ))}
-                          </Tbody>
-                        </Table>
-                      </TableContainer>
-                    ) : (<Text>No individual expenses recorded for this event.</Text>)
-                  )}
-                </AccordionPanel>
+    <div className="space-y-8 fade-in">
+      {/* Header Section */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center justify-between">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight text-white italic">Event Expense Summary</h1>
+          <p className="text-slate-400">View detailed costs categorized by tour events.</p>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+          <Input
+            placeholder="Filter by event, group, or location..."
+            className="pl-10 w-full md:w-80 bg-white/5 border-white/10"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Main Summary Accordion */}
+      <div className="space-y-4">
+        {filteredSummary.length > 0 ? (
+          <Accordion type="multiple" className="w-full space-y-4">
+            {filteredSummary.map(event => (
+              <AccordionItem key={event.event_id} value={event.event_id.toString()} className="border-none">
+                <Card className="border-white/5 bg-slate-900/40 backdrop-blur-md overflow-hidden hover:bg-slate-900/60 transition-all rounded-[2rem] shadow-xl">
+                  <AccordionTrigger
+                    onClick={() => handleAccordionChange(event.event_id)}
+                    className="px-6 py-6 hover:no-underline group"
+                  >
+                    <div className="flex flex-1 items-center justify-between pr-6 text-left">
+                      <div className="flex items-center gap-5">
+                        <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
+                          <Receipt className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-white group-hover:text-primary transition-colors">{event.event_name}</h3>
+                          <div className="flex items-center gap-3 mt-1">
+                            <Badge variant="outline" className="text-[10px] py-0 border-white/10 text-slate-500 font-normal uppercase tracking-widest">{event.group_name}</Badge>
+                            <span className="text-[10px] text-slate-600 font-bold uppercase flex items-center gap-1">
+                              <MapPin className="h-3 w-3" /> {event.location_name}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right hidden sm:block">
+                          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">Total Quantity</p>
+                          <Badge variant="secondary" className="bg-white/5 text-slate-400 border-none font-mono">Qty: {event.total_quantity}</Badge>
+                        </div>
+                        <div className="text-right min-w-[120px]">
+                          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-1">Total Cost</p>
+                          <p className="text-xl font-bold font-mono text-primary tracking-tighter italic">৳{event.total_expense.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6 pb-6 pt-2">
+                    <div className="border-t border-white/5 pt-6 space-y-4">
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-500 mb-4">
+                        <History className="h-3.5 w-3.5" /> User breakdown per event
+                      </div>
+
+                      {loadingDetailsEventId === event.event_id ? (
+                        <div className="flex flex-col gap-2">
+                          <Skeleton className="h-12 w-full rounded-xl" />
+                          <Skeleton className="h-12 w-full rounded-xl" />
+                        </div>
+                      ) : (
+                        details[event.event_id]?.length > 0 ? (
+                          <div className="rounded-2xl border border-white/10 overflow-hidden bg-black/20">
+                            <Table>
+                              <TableHeader className="bg-white/5">
+                                <TableRow>
+                                  <TableHead className="text-slate-400">User</TableHead>
+                                  <TableHead className="text-center text-slate-400">Quantity</TableHead>
+                                  <TableHead className="text-right text-slate-400">Cost</TableHead>
+                                  <TableHead className="text-right text-slate-400">Timestamp</TableHead>
+                                  <TableHead className="w-[80px]"></TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {details[event.event_id].map((detail) => (
+                                  <TableRow key={detail.expense_id} className="hover:bg-white/5 border-white/10">
+                                    <TableCell className="font-medium text-slate-200 flex items-center gap-2">
+                                      <User className="h-3.5 w-3.5 text-primary" />
+                                      {detail.username}
+                                    </TableCell>
+                                    <TableCell className="text-center font-mono">{detail.quantity}</TableCell>
+                                    <TableCell className="text-right font-bold font-mono text-white">৳{detail.total_cost.toLocaleString()}</TableCell>
+                                    <TableCell className="text-right text-[10px] text-slate-500 whitespace-nowrap">
+                                      {new Date(detail.expense_timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-1">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-white rounded-lg">
+                                          <Edit3 className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
+                                          onClick={() => handleDeleteClick({ ...detail, event_id: event.event_id })}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        ) : (
+                          <div className="py-6 text-center text-xs text-slate-600 italic">
+                            No records found for this event.
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </AccordionContent>
+                </Card>
               </AccordionItem>
             ))}
           </Accordion>
+        ) : (
+          <div className="py-24 text-center space-y-6 bg-white/[0.02] border-2 border-dashed border-white/5 rounded-[3rem]">
+            <div className="inline-flex p-6 bg-white/5 rounded-full text-slate-700">
+              <FileText className="h-16 w-16" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-xl font-bold text-slate-400">No Expenses Recorded</h3>
+              <p className="text-slate-500 max-w-sm mx-auto">
+                No event-based costs have been added yet.
+              </p>
+            </div>
+          </div>
         )}
-      </Box>
-      <AdminEditExpenseModal isOpen={isEditOpen} onClose={onEditClose} expense={selectedExpense} onUpdate={() => {
-          refreshDetailsForEvent(selectedExpense.event_id);
-          fetchSummary();
-      }} />
-      <DeleteConfirmationDialog isOpen={isDeleteOpen} onClose={onDeleteClose} onConfirm={confirmDelete} title="Delete Expense" body="Are you sure you want to permanently delete this expense record?" />
-    </>
+      </div>
+
+      {/* Deletion Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-500">
+              <AlertCircle className="h-5 w-5" /> Delete Expense?
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              Are you sure you want to permanently delete the expense for <span className="text-white font-medium">{selectedExpense?.username}</span>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)} className="text-slate-400">Cancel</Button>
+            <Button variant="destructive" onClick={confirmDelete} className="bg-red-600">Delete Record</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 };
 

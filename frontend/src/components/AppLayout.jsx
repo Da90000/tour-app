@@ -1,77 +1,234 @@
-// src/components/AppLayout.jsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
 import {
-  Box, Flex, Heading, Button, Spacer, Text, useBreakpointValue,
-  Image, Tooltip,
-} from '@chakra-ui/react';
-import { Outlet, useNavigate, Link as RouterLink } from 'react-router-dom';
+  LayoutDashboard,
+  Wallet,
+  ReceiptText,
+  PlusCircle,
+  HandCoins,
+  Menu,
+  X,
+  LogOut,
+  User,
+  Plane,
+  ChevronDown,
+  Settings,
+  Bell,
+  Search,
+  Compass,
+  Shield,
+  Calendar,
+  ArrowLeftRight,
+  CircleUser,
+  ChevronRight,
+  Globe
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import MobileNav from './MobileNav';
-
-const logoPath = '/tour-logo.svg';
+import { Button } from './ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
+import { cn } from '../lib/utils';
 
 const AppLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const isDesktop = useBreakpointValue({ base: false, md: true });
+  const location = useLocation();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [scrolled, setScrolled] = useState(false);
+
   const isAdmin = user && user.role === 'admin';
 
-  const handleLogout = () => { logout(); navigate('/login'); };
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const mainNav = [
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { name: isAdmin ? 'Finances' : 'My Expenses', path: isAdmin ? '/admin/finances' : '/my-expenses', icon: Wallet },
+  ];
+
+  const operationsNav = [
+    { name: 'Event Expenses', path: '/admin/event-expenses', icon: ReceiptText },
+    { name: 'Add Expense', path: '/admin/add-expense', icon: PlusCircle },
+    { name: 'Deposit Funds', path: '/admin/deposit', icon: HandCoins },
+  ];
+
+  const NavItem = ({ item, isCollapsed }) => {
+    const isActive = location.pathname === item.path;
+    return (
+      <Link to={item.path} className="block w-full">
+        <div className={cn(
+          "group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 relative overflow-hidden mb-1",
+          isActive
+            ? "bg-primary text-white shadow-lg shadow-primary/20"
+            : "text-slate-400 hover:text-white hover:bg-white/5"
+        )}>
+          <item.icon className={cn("h-5 w-5 shrink-0 transition-transform group-hover:scale-110", isActive ? "text-white" : "text-primary/70")} />
+          {!isCollapsed && <span className="font-medium text-sm tracking-tight">{item.name}</span>}
+          {isActive && (
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-l-full" />
+          )}
+        </div>
+      </Link>
+    );
+  };
 
   return (
-    <Box>
-      <Flex
-        as="nav" align="center" justify="space-between" wrap="wrap"
-        py={0} px={4} bg="brand.900" color="white" position="relative"
-      >
-        <Flex as={RouterLink} to="/dashboard" align="center" _hover={{ textDecoration: 'none' }}>
-          <Image boxSize="100px" src={logoPath} alt="App Logo" mr={2} />
-          <Heading fontSize={"md"} fontWeight={"normal"} size="sm" letterSpacing="normal">
-            Trip Planner
-          </Heading>
-        </Flex>
+    <div className="min-h-screen bg-[#020617] text-white selection:bg-primary/30 flex overflow-hidden">
+      {/* Background Decor */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] bg-violet-600/5 rounded-full blur-[100px]" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-full h-[1px] bg-gradient-to-r from-transparent via-white/5 to-transparent shadow-[0_0_15px_rgba(255,255,255,0.05)]" />
+      </div>
 
-        <Spacer />
-
-        {isDesktop ? (
-          <Box display="flex" alignItems="center">
-            {user && (
-              <Tooltip label={user.username} placement="bottom" hasArrow>
-                <Text as="span" mr={4} maxW="150px" isTruncated>
-                  Welcome, {user.username}!
-                </Text>
-              </Tooltip>
+      {/* Desktop Sidebar */}
+      <aside className={cn(
+        "hidden lg:flex flex-col border-r border-white/5 bg-slate-900/40 backdrop-blur-3xl z-50 transition-all duration-500 ease-in-out sticky top-0 h-screen",
+        isSidebarOpen ? "w-72" : "w-20"
+      )}>
+        <div className="p-6 flex items-center justify-between">
+          <Link to="/dashboard" className="flex items-center gap-3 group">
+            <div className="h-10 w-10 bg-primary rounded-xl flex items-center justify-center shadow-2xl shadow-primary/40 group-hover:rotate-12 transition-transform">
+              <Plane className="h-6 w-6 text-white -rotate-45" />
+            </div>
+            {isSidebarOpen && (
+              <span className="text-xl font-bold tracking-tighter italic">
+                TRIP<span className="text-primary not-italic">PLANNER</span>
+              </span>
             )}
+          </Link>
+        </div>
 
-            <Button as={RouterLink} to={isAdmin ? "/admin/finances" : "/my-expenses"} colorScheme="brand" variant="ghost">
-              {isAdmin ? "Finances" : "My Finances"}
-            </Button>
+        <nav className="flex-1 px-4 py-8 space-y-8 overflow-y-auto scrollbar-none">
+          <div>
+            {isSidebarOpen && <p className="text-[10px] uppercase font-bold tracking-[0.3em] text-slate-500 ml-3 mb-4">Core Systems</p>}
+            {mainNav.map(item => <NavItem key={item.path} item={item} isCollapsed={!isSidebarOpen} />)}
+          </div>
 
-            {isAdmin && (
-              <>
-                <Button as={RouterLink} to="/admin/event-expenses" colorScheme="brand" variant="ghost">
-                  Event Expenses
+          {isAdmin && (
+            <div className="pt-4">
+              {isSidebarOpen && <p className="text-[10px] uppercase font-bold tracking-[0.3em] text-slate-500 ml-3 mb-4">Operations Control</p>}
+              {operationsNav.map(item => <NavItem key={item.path} item={item} isCollapsed={!isSidebarOpen} />)}
+            </div>
+          )}
+        </nav>
+
+        <div className="p-4 border-t border-white/5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-center text-slate-500 hover:text-white"
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          >
+            {isSidebarOpen ? <ArrowLeftRight className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+        </div>
+      </aside>
+
+      {/* Main Wrapper */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <header className={cn(
+          "h-16 sticky top-0 z-40 flex items-center justify-between px-6 transition-all duration-300",
+          scrolled ? "bg-slate-900/80 backdrop-blur-xl border-b border-white/5" : "bg-transparent"
+        )}>
+          <div className="flex items-center gap-4">
+            <div className="lg:hidden h-10 w-10 bg-primary/20 rounded-xl flex items-center justify-center border border-primary/20">
+              <Plane className="h-5 w-5 text-primary -rotate-45" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-4 font-mono">
+            <div className="hidden sm:flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold tracking-widest text-slate-400">
+              <Globe className="h-3 w-3 text-emerald-500 animate-pulse" />
+              SIGNAL: OPTIMAL
+            </div>
+
+            <div className="h-8 w-px bg-white/10 mx-2 hidden sm:block" />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-10 flex items-center gap-3 px-2 hover:bg-white/5 rounded-xl transition-all">
+                  <div className="text-right hidden sm:block">
+                    <p className="text-xs font-bold text-white tracking-tight uppercase">{user?.username}</p>
+                    <p className="text-[10px] text-primary/70 font-bold uppercase">{user?.role}</p>
+                  </div>
+                  <Avatar className="h-9 w-9 border-2 border-primary/20 shadow-xl">
+                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username}`} />
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      {user?.username?.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <ChevronDown className="h-3 w-3 text-slate-500" />
                 </Button>
-                <Button as={RouterLink} to="/admin/add-expense" colorScheme="brand" variant="ghost">
-                  Add Expense
-                </Button>
-                <Button as={RouterLink} to="/admin/deposit" colorScheme="brand" variant="ghost">
-                  Deposit
-                </Button>
-              </>
-            )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-slate-900/90 backdrop-blur-xl border-white/10 rounded-2xl p-2">
+                <DropdownMenuLabel className="px-3 py-2">
+                  <p className="text-xs font-bold text-slate-500 tracking-widest uppercase">Member Registry</p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/5" />
+                <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-xl cursor-not-allowed opacity-50">
+                  <User className="h-4 w-4" />
+                  <span>Profile Uplink</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="flex items-center gap-3 p-3 rounded-xl cursor-not-allowed opacity-50">
+                  <Settings className="h-4 w-4" />
+                  <span>Global Config</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/5" />
+                <DropdownMenuItem
+                  className="flex items-center gap-3 p-3 rounded-xl text-red-400 focus:text-red-300 focus:bg-red-500/10 cursor-pointer"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="font-bold uppercase text-xs tracking-widest">Terminate Session</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-            <Button colorScheme="brand" variant="outline" onClick={handleLogout} ml={4}>Logout</Button>
-          </Box>
-        ) : (
-          <MobileNav onLogout={handleLogout} isAdmin={isAdmin} />
-        )}
-      </Flex>
+            {/* Mobile Menu */}
+            <div className="lg:hidden">
+              <Button variant="ghost" size="icon" className="text-slate-400">
+                <Menu className="h-6 w-6" />
+              </Button>
+            </div>
+          </div>
+        </header>
 
-      <Box p={{ base: 4, md: 8 }}>
-        <Outlet />
-      </Box>
-    </Box>
+        {/* Content */}
+        <main className="flex-1 overflow-y-auto px-6 py-8 relative">
+          <div className="max-w-7xl mx-auto min-h-[calc(100vh-12rem)]">
+            <Outlet />
+          </div>
+
+          <footer className="mt-20 pt-8 pb-12 border-t border-white/5">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] font-bold tracking-[0.3em] text-slate-600 uppercase">
+              <div>Trip Planner v2.0-stable</div>
+              <div className="flex items-center gap-8">
+                <span className="hover:text-primary transition-colors cursor-pointer italic underline">Privacy Policy</span>
+                <span className="hover:text-primary transition-colors cursor-pointer italic underline">Terms of Service</span>
+              </div>
+              <div>© 2026 TRIP PLANNER EXPEDITION CONTROL</div>
+            </div>
+          </footer>
+        </main>
+      </div>
+    </div>
   );
 };
 

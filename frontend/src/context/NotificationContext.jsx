@@ -1,40 +1,28 @@
 // src/context/NotificationContext.jsx
 import React, { createContext, useContext, useEffect, useRef } from 'react';
-import { useToast, Box, Text, Heading } from '@chakra-ui/react';
+import { toast } from 'sonner';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 import api from '../api/api';
+import { Bell, Info } from 'lucide-react';
 
 const NotificationContext = createContext();
 
 export const useNotifications = () => useContext(NotificationContext);
 
-// This is a custom component for the toast UI
-const NotificationToast = ({ title, message }) => (
-    <Box color="white" p={4} bg="purple.500" borderRadius="lg" boxShadow="lg">
-        <Heading size="sm">{title}</Heading>
-        <Text mt={2}>{message}</Text>
-    </Box>
-);
-
 export const NotificationProvider = ({ children }) => {
     const { isAuthenticated } = useAuth();
-    const toast = useToast();
     const socketRef = useRef(null);
     const audioRef = useRef(null);
 
     useEffect(() => {
-        // Only connect if the user is authenticated
         if (isAuthenticated) {
-            // Initialize the audio element
             if (!audioRef.current) {
-                audioRef.current = new Audio('/notification.wav'); // Assumes the file is in /public
+                audioRef.current = new Audio('/notification.wav');
             }
 
-            // Connect to the WebSocket server
             socketRef.current = io('/');
 
-            // 1. Join all relevant group rooms
             const joinGroupRooms = async () => {
                 try {
                     const response = await api.get('/groups');
@@ -49,27 +37,23 @@ export const NotificationProvider = ({ children }) => {
 
             joinGroupRooms();
 
-            // 2. Listen for 'notification' events from the server
             socketRef.current.on('notification', ({ title, message }) => {
-                // Play the sound
                 audioRef.current.play().catch(e => console.error("Error playing sound:", e));
 
-                // Show the Chakra UI toast
-                toast({
-                    position: 'top-right',
-                    duration: 7000, // 7 seconds
-                    isClosable: true,
-                    render: () => <NotificationToast title={title} message={message} />,
+                toast(title, {
+                    description: message,
+                    icon: <Bell className="h-4 w-4 text-primary" />,
+                    duration: 7000,
                 });
             });
 
-            // Cleanup on component unmount or when user logs out
             return () => {
-                console.log("Disconnecting socket...");
-                socketRef.current.disconnect();
+                if (socketRef.current) {
+                    socketRef.current.disconnect();
+                }
             };
         }
-    }, [isAuthenticated, toast]);
+    }, [isAuthenticated]);
 
     return (
         <NotificationContext.Provider value={{}}>
